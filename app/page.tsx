@@ -4,17 +4,27 @@ import { useEffect, useState } from "react";
 import SentenceInput from "@/components/SentenceInput";
 import Recorder from "@/components/Recorder";
 import ResultCard from "@/components/ResultCard";
-import { fetchSentences, analyzeFree } from "@/lib/api";
+import ChoiceScreen from "@/components/ChoiceScreen";
+import AllResultsCard, { VariantResult } from "@/components/AllResultsCard";
+import {
+  fetchSentences,
+  analyzeFree,
+  analyzeById,
+  ANALYZE_VARIANTS,
+} from "@/lib/api";
 import { AnalysisResponse, Sentence } from "@/types/analysis";
 
-type Stage = "select" | "recording" | "result";
+type Stage = "select" | "recording" | "choose" | "result" | "results-all";
+type LoadingKind = "original" | "all" | null;
 
 export default function Home() {
   const [sentences, setSentences] = useState<Sentence[]>([]);
   const [stage, setStage] = useState<Stage>("select");
   const [selected, setSelected] = useState<Sentence | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [choiceLoading, setChoiceLoading] = useState<LoadingKind>(null);
   const [result, setResult] = useState<AnalysisResponse | null>(null);
+  const [allResults, setAllResults] = useState<VariantResult[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -26,24 +36,71 @@ export default function Home() {
   function handleSelect(sentence: Sentence) {
     setSelected(sentence);
     setResult(null);
+    setAllResults(null);
+    setAudioBlob(null);
     setError(null);
     setStage("recording");
   }
 
-  async function handleAudio(blob: Blob) {
-    if (!selected) return;
-    setLoading(true);
+  function handleAudio(blob: Blob) {
+    setAudioBlob(blob);
+    setError(null);
+    setStage("choose");
+  }
+
+  async function runOriginal() {
+    if (!selected || !audioBlob) return;
+    setChoiceLoading("original");
     setError(null);
     try {
-      const data = await analyzeFree(blob, selected.text);
+      const data = await analyzeFree(audioBlob, selected.text);
       setResult(data);
       setStage("result");
     } catch (e) {
       setError(e instanceof Error ? e.message : "분석 중 오류가 발생했습니다.");
-      setStage("recording");
     } finally {
-      setLoading(false);
+      setChoiceLoading(null);
     }
+  }
+
+  async function runAll() {
+    if (!selected || !audioBlob) return;
+    setChoiceLoading("all");
+    setError(null);
+
+    const settled = await Promise.allSettled(
+      ANALYZE_VARIANTS.map((v) => analyzeById(audioBlob, selected.id, v.path))
+    );
+
+    const merged: VariantResult[] = ANALYZE_VARIANTS.map((v, i) => {
+      const r = settled[i];
+      if (r.status === "fulfilled") {
+        return { key: v.key, label: v.label, path: v.path, data: r.value, error: null };
+      }
+      const msg = r.reason instanceof Error ? r.reason.message : String(r.reason);
+      return { key: v.key, label: v.label, path: v.path, data: null, error: msg };
+    });
+
+    setAllResults(merged);
+    setChoiceLoading(null);
+    setStage("results-all");
+  }
+
+  function backToRecording() {
+    setError(null);
+    setResult(null);
+    setAllResults(null);
+    setAudioBlob(null);
+    setStage("recording");
+  }
+
+  function backToSelect() {
+    setError(null);
+    setResult(null);
+    setAllResults(null);
+    setAudioBlob(null);
+    setSelected(null);
+    setStage("select");
   }
 
   return (
@@ -62,7 +119,17 @@ export default function Home() {
         <Recorder
           sentence={selected.text}
           onResult={handleAudio}
-          loading={loading}
+          loading={false}
+        />
+      )}
+
+      {stage === "choose" && selected && (
+        <ChoiceScreen
+          sentence={selected.text}
+          loading={choiceLoading}
+          onOriginal={runOriginal}
+          onAll={runAll}
+          onBack={backToRecording}
         />
       )}
 
@@ -70,8 +137,17 @@ export default function Home() {
         <ResultCard
           sentence={selected.text}
           result={result}
-          onRetry={() => setStage("recording")}
-          onNew={() => setStage("select")}
+          onRetry={backToRecording}
+          onNew={backToSelect}
+        />
+      )}
+
+      {stage === "results-all" && allResults && selected && (
+        <AllResultsCard
+          sentence={selected.text}
+          results={allResults}
+          onRetry={backToRecording}
+          onNew={backToSelect}
         />
       )}
     </main>

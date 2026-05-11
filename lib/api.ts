@@ -28,3 +28,35 @@ export async function analyzeFree(
 
   return res.json();
 }
+
+export const ANALYZE_VARIANTS = [
+  { key: "default", label: "기본 (analyze)", path: "/api/v1/analyze" },
+  { key: "full", label: "Full", path: "/api/v1/analyze/full" },
+  { key: "preprocess", label: "Preprocess", path: "/api/v1/analyze/preprocess" },
+  { key: "prompt", label: "Prompt", path: "/api/v1/analyze/prompt" },
+  { key: "silence-only", label: "Silence Only", path: "/api/v1/analyze/silence-only" },
+] as const;
+
+export type AnalyzeVariantKey = (typeof ANALYZE_VARIANTS)[number]["key"];
+
+export async function analyzeById(
+  audioBlob: Blob,
+  sentenceId: string,
+  path: string
+): Promise<AnalysisResponse> {
+  const form = new FormData();
+  form.append("audio", audioBlob, "audio.webm");
+  form.append("sentence_id", sentenceId);
+
+  const res = await fetch(`${BACKEND}${path}`, {
+    method: "POST",
+    body: form,
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || `HTTP ${res.status}`);
+  }
+
+  return res.json();
+}
