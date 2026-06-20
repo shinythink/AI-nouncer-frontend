@@ -164,6 +164,7 @@ export default function Home() {
           mode={mode}
           durationMs={durationMs}
           syllableCount={selected.text.replace(/[^가-힣]/g, "").length}
+          sentenceId={selected.id}
           onRetry={backToRecording}
           onNew={backToSelect}
         />

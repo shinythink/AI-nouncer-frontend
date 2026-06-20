@@ -8,6 +8,23 @@ export interface Sentence {
 
 export type GameMode = "accuracy" | "timeattack" | "boss";
 
+export interface LeaderboardEntry {
+  nickname: string;
+  score: number;
+  sentence_id: string;
+  mode: string;
+  grade?: string | null;
+  created_at: string;
+}
+
+export interface ScoreSubmission {
+  nickname: string;
+  score: number;
+  sentence_id: string;
+  mode: GameMode;
+  grade?: string | null;
+}
+
 export interface AlignmentItem {
   expected: string;
   heard: string;

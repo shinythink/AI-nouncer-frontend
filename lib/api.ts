@@ -1,4 +1,9 @@
-import { AnalysisResponse, Sentence } from "@/types/analysis";
+import {
+  AnalysisResponse,
+  LeaderboardEntry,
+  ScoreSubmission,
+  Sentence,
+} from "@/types/analysis";
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8000";
 
@@ -26,6 +31,33 @@ export async function analyzeFree(
     throw new Error(text || `HTTP ${res.status}`);
   }
 
+  return res.json();
+}
+
+export async function submitScore(sub: ScoreSubmission): Promise<LeaderboardEntry> {
+  const res = await fetch(`${BACKEND}/api/v1/leaderboard`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(sub),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function fetchLeaderboard(params: {
+  mode?: string;
+  sentence_id?: string;
+  limit?: number;
+}): Promise<LeaderboardEntry[]> {
+  const q = new URLSearchParams();
+  if (params.mode) q.set("mode", params.mode);
+  if (params.sentence_id) q.set("sentence_id", params.sentence_id);
+  if (params.limit) q.set("limit", String(params.limit));
+  const res = await fetch(`${BACKEND}/api/v1/leaderboard?${q.toString()}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
 

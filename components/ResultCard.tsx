@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { AnalysisResponse, GameMode, Grade, SyllableJudgment, Verdict } from "@/types/analysis";
+import Leaderboard from "./Leaderboard";
 
 interface Props {
   sentence: string;
@@ -11,6 +12,7 @@ interface Props {
   mode?: GameMode;
   durationMs?: number;
   syllableCount?: number;
+  sentenceId?: string;
 }
 
 const STAGGER_MS = 70; // 칩 순차 등장 간격
@@ -64,6 +66,7 @@ export default function ResultCard({
   mode = "accuracy",
   durationMs = 0,
   syllableCount,
+  sentenceId,
 }: Props) {
   const { reliable, score, grade, max_combo, syllable_judgments, advice } = result;
 
@@ -91,14 +94,18 @@ export default function ResultCard({
           <p className="text-lg font-semibold text-gray-700">{sentence}</p>
         </div>
 
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-8 flex flex-col items-center gap-3 text-center">
-          <span className="text-5xl">🎙️</span>
-          <p className="text-lg font-bold text-amber-900">음성 인식이 불안정해요. 다시 도전!</p>
-          <p className="text-sm text-amber-700">
-            녹음이 또렷하지 않아 점수를 매기지 않았어요. 조용한 곳에서 다시 한 번 읽어보세요.
+        <div className="bg-gradient-to-br from-fuchsia-50 to-indigo-50 border border-fuchsia-200 rounded-2xl p-8 flex flex-col items-center gap-3 text-center">
+          <span className="text-6xl animate-badge-in">👾</span>
+          <p className="text-lg font-black text-fuchsia-900">방해꾼이 끼어들었다!</p>
+          <p className="text-sm text-fuchsia-700">
+            잡음 요정이 네 목소리를 가로채 엉뚱한 말로 바꿔버렸어. 점수는 무효!
+            <br />
+            다시 또렷하게 외쳐서 방해꾼을 물리치자.
           </p>
           {result.transcript && (
-            <p className="text-xs text-amber-600/80 mt-1">인식된 음성: “{result.transcript}”</p>
+            <p className="text-xs text-fuchsia-500/80 mt-1 italic">
+              방해꾼이 흘린 말: “{result.transcript}”
+            </p>
           )}
         </div>
 
@@ -248,6 +255,15 @@ export default function ResultCard({
             )}
           </details>
         )
+      )}
+
+      {sentenceId && (
+        <Leaderboard
+          sentenceId={sentenceId}
+          mode={mode}
+          score={timeAttack ? timeAttack.finalScore : (score ?? 0)}
+          grade={gradeKey}
+        />
       )}
 
       <ActionButtons onRetry={onRetry} onNew={onNew} />
