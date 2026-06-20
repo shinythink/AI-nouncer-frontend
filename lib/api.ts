@@ -29,6 +29,28 @@ export async function analyzeFree(
   return res.json();
 }
 
+// 보스전 전용: 백엔드에서 LLM 코치를 호출하는 유일한 경로(/analyze/boss).
+export async function analyzeBoss(
+  audioBlob: Blob,
+  sentenceId: string
+): Promise<AnalysisResponse> {
+  const form = new FormData();
+  form.append("audio", audioBlob, "audio.webm");
+  form.append("sentence_id", sentenceId);
+
+  const res = await fetch(`${BACKEND}/api/v1/analyze/boss`, {
+    method: "POST",
+    body: form,
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || `HTTP ${res.status}`);
+  }
+
+  return res.json();
+}
+
 export const ANALYZE_VARIANTS = [
   { key: "default", label: "기본 (analyze)", path: "/api/v1/analyze" },
   { key: "full", label: "Full", path: "/api/v1/analyze/full" },

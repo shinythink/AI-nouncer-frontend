@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import ModeSelect from "@/components/ModeSelect";
 import SentenceInput from "@/components/SentenceInput";
 import Recorder from "@/components/Recorder";
 import ResultCard from "@/components/ResultCard";
@@ -10,18 +11,21 @@ import {
   fetchSentences,
   analyzeFree,
   analyzeById,
+  analyzeBoss,
   ANALYZE_VARIANTS,
 } from "@/lib/api";
-import { AnalysisResponse, Sentence } from "@/types/analysis";
+import { AnalysisResponse, GameMode, Sentence } from "@/types/analysis";
 
-type Stage = "select" | "recording" | "choose" | "result" | "results-all";
+type Stage = "mode" | "select" | "recording" | "choose" | "result" | "results-all";
 type LoadingKind = "original" | "all" | null;
 
 export default function Home() {
   const [sentences, setSentences] = useState<Sentence[]>([]);
-  const [stage, setStage] = useState<Stage>("select");
+  const [stage, setStage] = useState<Stage>("mode");
+  const [mode, setMode] = useState<GameMode>("accuracy");
   const [selected, setSelected] = useState<Sentence | null>(null);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [durationMs, setDurationMs] = useState<number>(0);
   const [choiceLoading, setChoiceLoading] = useState<LoadingKind>(null);
   const [result, setResult] = useState<AnalysisResponse | null>(null);
   const [allResults, setAllResults] = useState<VariantResult[] | null>(null);
@@ -33,17 +37,30 @@ export default function Home() {
       .catch(() => setError("문장 목록을 불러오지 못했습니다. 백엔드가 실행 중인지 확인하세요."));
   }, []);
 
-  function handleSelect(sentence: Sentence) {
-    setSelected(sentence);
+  function resetRound() {
     setResult(null);
     setAllResults(null);
     setAudioBlob(null);
+    setDurationMs(0);
     setError(null);
+  }
+
+  function handleMode(m: GameMode) {
+    setMode(m);
+    setSelected(null);
+    resetRound();
+    setStage("select");
+  }
+
+  function handleSelect(sentence: Sentence) {
+    setSelected(sentence);
+    resetRound();
     setStage("recording");
   }
 
-  function handleAudio(blob: Blob) {
+  function handleAudio(blob: Blob, recordedMs: number) {
     setAudioBlob(blob);
+    setDurationMs(recordedMs);
     setError(null);
     setStage("choose");
   }
@@ -53,7 +70,10 @@ export default function Home() {
     setChoiceLoading("original");
     setError(null);
     try {
-      const data = await analyzeFree(audioBlob, selected.text);
+      const data =
+        mode === "boss"
+          ? await analyzeBoss(audioBlob, selected.id)
+          : await analyzeFree(audioBlob, selected.text);
       setResult(data);
       setStage("result");
     } catch (e) {
@@ -87,20 +107,20 @@ export default function Home() {
   }
 
   function backToRecording() {
-    setError(null);
-    setResult(null);
-    setAllResults(null);
-    setAudioBlob(null);
+    resetRound();
     setStage("recording");
   }
 
   function backToSelect() {
-    setError(null);
-    setResult(null);
-    setAllResults(null);
-    setAudioBlob(null);
+    resetRound();
     setSelected(null);
     setStage("select");
+  }
+
+  function backToMode() {
+    resetRound();
+    setSelected(null);
+    setStage("mode");
   }
 
   return (
@@ -111,21 +131,25 @@ export default function Home() {
         </div>
       )}
 
+      {stage === "mode" && <ModeSelect onSelect={handleMode} />}
+
       {stage === "select" && (
-        <SentenceInput sentences={sentences} onSelect={handleSelect} />
+        <SentenceInput
+          sentences={sentences}
+          mode={mode}
+          onSelect={handleSelect}
+          onBack={backToMode}
+        />
       )}
 
       {stage === "recording" && selected && (
-        <Recorder
-          sentence={selected.text}
-          onResult={handleAudio}
-          loading={false}
-        />
+        <Recorder sentence={selected.text} onResult={handleAudio} loading={false} />
       )}
 
       {stage === "choose" && selected && (
         <ChoiceScreen
           sentence={selected.text}
+          mode={mode}
           loading={choiceLoading}
           onOriginal={runOriginal}
           onAll={runAll}
@@ -137,6 +161,9 @@ export default function Home() {
         <ResultCard
           sentence={selected.text}
           result={result}
+          mode={mode}
+          durationMs={durationMs}
+          syllableCount={selected.text.replace(/[^가-힣]/g, "").length}
           onRetry={backToRecording}
           onNew={backToSelect}
         />
