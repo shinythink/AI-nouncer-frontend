@@ -24,3 +24,21 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* --- 게임화 결과 화면 애니메이션 (CSS only, 라이브러리 미사용) --- */
+@keyframes chip-in {
+  from { opacity: 0; transform: translateY(6px) scale(0.9); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes combo-pop {
+  0%   { opacity: 0; transform: translate(-50%, 4px) scale(0.5); }
+  60%  { opacity: 1; transform: translate(-50%, -2px) scale(1.15); }
+  100% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}
+@keyframes badge-in {
+  from { opacity: 0; transform: scale(0.6); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.animate-chip-in  { animation: chip-in 0.32s ease-out both; }
+.animate-combo-pop { animation: combo-pop 0.45s ease-out both; }
+.animate-badge-in { animation: badge-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
