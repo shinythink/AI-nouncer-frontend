@@ -1,7 +1,12 @@
 export interface Sentence {
   id: string;
   text: string;
+  // --- 스테이지 메타데이터 (STEP 3) ---
+  difficulty: number; // 1~5
+  target_pattern: string; // "ㅅ계열" | "종성" | "혼합"
 }
+
+export type GameMode = "accuracy" | "timeattack" | "boss";
 
 export interface AlignmentItem {
   expected: string;

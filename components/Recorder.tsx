@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 
 interface Props {
   sentence: string;
-  onResult: (blob: Blob) => void;
+  onResult: (blob: Blob, durationMs: number) => void;
   loading: boolean;
 }
 
@@ -12,6 +12,7 @@ export default function Recorder({ sentence, onResult, loading }: Props) {
   const [recording, setRecording] = useState(false);
   const mediaRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const startedAtRef = useRef<number>(0); // 녹음 길이 측정 (타임어택 모드 전제)
 
   async function startRecording() {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -30,10 +31,12 @@ export default function Recorder({ sentence, onResult, loading }: Props) {
     recorder.onstop = () => {
       stream.getTracks().forEach((t) => t.stop());
       const blob = new Blob(chunksRef.current, { type: mimeType });
-      onResult(blob);
+      const durationMs = Date.now() - startedAtRef.current;
+      onResult(blob, durationMs);
     };
 
     recorder.start();
+    startedAtRef.current = Date.now();
     mediaRef.current = recorder;
     setRecording(true);
   }

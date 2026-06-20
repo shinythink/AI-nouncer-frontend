@@ -1,17 +1,21 @@
 "use client";
 
 import { useMemo } from "react";
-import { AnalysisResponse, Grade, SyllableJudgment, Verdict } from "@/types/analysis";
+import { AnalysisResponse, GameMode, Grade, SyllableJudgment, Verdict } from "@/types/analysis";
 
 interface Props {
   sentence: string;
   result: AnalysisResponse;
   onRetry: () => void;
   onNew: () => void;
+  mode?: GameMode;
+  durationMs?: number;
+  syllableCount?: number;
 }
 
 const STAGGER_MS = 70; // 칩 순차 등장 간격
 const COMBO_MIN = 3; // 이 길이 이상의 연속 good 구간에만 콤보 팝업
+const TARGET_MS_PER_SYL = 400; // 타임어택 목표 속도(음절당)
 
 const GRADE_STYLE: Record<Grade, string> = {
   S: "bg-gradient-to-br from-amber-300 to-yellow-500 text-white ring-4 ring-amber-200 shadow-lg shadow-amber-200",
@@ -27,7 +31,6 @@ const VERDICT_CHIP: Record<Verdict, string> = {
   bad: "bg-red-100 text-red-700 border-red-300",
 };
 
-// 칩에 붙는 작은 사유 라벨
 function reasonLabel(j: SyllableJudgment): string | null {
   if (j.verdict === "warn") return "종성?";
   if (j.verdict === "bad") return j.heard ? `→${j.heard}` : "누락";
@@ -53,10 +56,17 @@ function ActionButtons({ onRetry, onNew }: { onRetry: () => void; onNew: () => v
   );
 }
 
-export default function ResultCard({ sentence, result, onRetry, onNew }: Props) {
+export default function ResultCard({
+  sentence,
+  result,
+  onRetry,
+  onNew,
+  mode = "accuracy",
+  durationMs = 0,
+  syllableCount,
+}: Props) {
   const { reliable, score, grade, max_combo, syllable_judgments, advice } = result;
 
-  // 연속 good 구간의 끝 인덱스 → 콤보 길이 (COMBO_MIN 이상만)
   const comboEnds = useMemo(() => {
     const ends: Record<number, number> = {};
     let run = 0;
@@ -72,7 +82,7 @@ export default function ResultCard({ sentence, result, onRetry, onNew }: Props) 
     return ends;
   }, [syllable_judgments]);
 
-  // --- reliable=False: 점수 미반영, 재도전 유도 ---
+  // --- reliable=False: 점수 미반영, 재도전 유도 (타임어택 속도보너스도 무효) ---
   if (!reliable) {
     return (
       <div className="flex flex-col gap-6 w-full max-w-lg">
@@ -97,9 +107,24 @@ export default function ResultCard({ sentence, result, onRetry, onNew }: Props) 
     );
   }
 
-  // --- reliable=True: 점수/등급/콤보/음절 칩 ---
+  // --- reliable=True ---
   const gradeKey = (grade ?? "D") as Grade;
   const chipsDone = syllable_judgments.length * STAGGER_MS;
+
+  // 타임어택: 최종 점수 = 발음 점수 × 속도 보너스(목표시간/실제시간, 0.5~1.5 클램프)
+  const sylCount = syllableCount ?? syllable_judgments.length;
+  const timeAttack =
+    mode === "timeattack" && durationMs > 0 && score != null && sylCount > 0
+      ? (() => {
+          const targetMs = sylCount * TARGET_MS_PER_SYL;
+          const bonus = Math.min(1.5, Math.max(0.5, targetMs / durationMs));
+          const finalScore = Math.max(0, Math.min(100, Math.round(score * bonus)));
+          return { bonus, finalScore, targetMs };
+        })()
+      : null;
+
+  const isBoss = mode === "boss";
+  const cleared = score != null && score >= 75; // 보스전 클리어 기준(B 이상)
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-lg">
@@ -126,6 +151,24 @@ export default function ResultCard({ sentence, result, onRetry, onNew }: Props) 
           </div>
         </div>
       </div>
+
+      {/* 타임어택: 속도 보너스 + 최종 점수 */}
+      {timeAttack && (
+        <div className="flex items-center justify-around bg-amber-50 border border-amber-200 rounded-xl p-3 text-center animate-badge-in">
+          <div>
+            <p className="text-[10px] uppercase tracking-wide text-amber-500">녹음 시간</p>
+            <p className="text-sm font-bold text-amber-800 tabular-nums">{(durationMs / 1000).toFixed(1)}초</p>
+          </div>
+          <div>
+            <p className="text-[10px] uppercase tracking-wide text-amber-500">속도 보너스</p>
+            <p className="text-sm font-bold text-amber-800 tabular-nums">×{timeAttack.bonus.toFixed(2)}</p>
+          </div>
+          <div>
+            <p className="text-[10px] uppercase tracking-wide text-orange-500">최종 점수</p>
+            <p className="text-lg font-black text-orange-700 tabular-nums">{timeAttack.finalScore}</p>
+          </div>
+        </div>
+      )}
 
       {/* 음절 칩 그리드 */}
       {syllable_judgments.length > 0 && (
@@ -159,27 +202,52 @@ export default function ResultCard({ sentence, result, onRetry, onNew }: Props) 
         </div>
       )}
 
-      {/* 코칭(advice): 보스전 등에서 재활용 — 게임 화면에선 보조 위치 */}
-      {advice?.focus && (
-        <details
-          className="bg-blue-50/60 border border-blue-100 rounded-xl px-4 py-3 animate-chip-in"
-          style={{ animationDelay: `${chipsDone + 100}ms` }}
-        >
-          <summary className="text-sm font-semibold text-blue-800 cursor-pointer select-none">
-            코칭 한마디 보기
-          </summary>
-          <p className="text-sm text-blue-900 mt-2">{advice.focus}</p>
+      {/* 보스전: AI 코치 코멘트를 전면에 (보스전에서만 LLM 호출됨) */}
+      {isBoss && advice?.focus ? (
+        <div className="bg-purple-50 border border-purple-200 rounded-xl p-4 flex flex-col gap-3 animate-badge-in">
+          <p className="text-sm font-bold text-purple-800">
+            {cleared ? "👑 보스 인정! 코치의 한마디" : "👑 보스의 한마디"}
+          </p>
+          <p className="text-base text-purple-900">{advice.focus}</p>
           {advice.drills?.length > 0 && (
-            <ul className="mt-2 flex flex-col gap-1">
+            <ul className="flex flex-col gap-1">
               {advice.drills.map((d, i) => (
-                <li key={i} className="text-sm text-blue-800/90 flex gap-1.5">
-                  <span className="text-blue-400 font-bold">·</span>
+                <li key={i} className="text-sm text-purple-800/90 flex gap-1.5">
+                  <span className="text-purple-400 font-bold">·</span>
                   {d}
                 </li>
               ))}
             </ul>
           )}
-        </details>
+          {advice.next_sentence && (
+            <div className="bg-white/70 border border-purple-200 rounded-lg px-3 py-2">
+              <p className="text-[10px] uppercase tracking-wide text-purple-400 mb-0.5">다음 추천 문장</p>
+              <p className="text-sm font-semibold text-purple-900">{advice.next_sentence}</p>
+            </div>
+          )}
+        </div>
+      ) : (
+        advice?.focus && (
+          <details
+            className="bg-blue-50/60 border border-blue-100 rounded-xl px-4 py-3 animate-chip-in"
+            style={{ animationDelay: `${chipsDone + 100}ms` }}
+          >
+            <summary className="text-sm font-semibold text-blue-800 cursor-pointer select-none">
+              코칭 한마디 보기
+            </summary>
+            <p className="text-sm text-blue-900 mt-2">{advice.focus}</p>
+            {advice.drills?.length > 0 && (
+              <ul className="mt-2 flex flex-col gap-1">
+                {advice.drills.map((d, i) => (
+                  <li key={i} className="text-sm text-blue-800/90 flex gap-1.5">
+                    <span className="text-blue-400 font-bold">·</span>
+                    {d}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </details>
+        )
       )}
 
       <ActionButtons onRetry={onRetry} onNew={onNew} />

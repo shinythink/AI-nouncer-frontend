@@ -1,23 +1,34 @@
 "use client";
 
+import { GameMode } from "@/types/analysis";
+
 type LoadingKind = "original" | "all" | null;
 
 interface Props {
   sentence: string;
+  mode: GameMode;
   loading: LoadingKind;
   onOriginal: () => void;
   onAll: () => void;
   onBack: () => void;
 }
 
+const PRIMARY_LABEL: Record<GameMode, { title: string; sub: string }> = {
+  accuracy: { title: "도전 결과 보기", sub: "정확도 채점" },
+  timeattack: { title: "타임어택 결과 보기", sub: "정확도 × 속도 보너스" },
+  boss: { title: "보스전 도전!", sub: "AI 코치 코멘트 포함 (/analyze/boss)" },
+};
+
 export default function ChoiceScreen({
   sentence,
+  mode,
   loading,
   onOriginal,
   onAll,
   onBack,
 }: Props) {
   const disabled = loading !== null;
+  const primary = PRIMARY_LABEL[mode];
 
   return (
     <div className="flex flex-col gap-8 w-full max-w-lg">
@@ -37,8 +48,8 @@ export default function ChoiceScreen({
           className="flex items-center justify-between bg-gray-50 hover:bg-blue-50 border border-gray-200 hover:border-blue-300 rounded-xl px-5 py-4 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <div className="text-left">
-            <p className="text-base font-semibold text-gray-800">원래 결과</p>
-            <p className="text-xs text-gray-500 mt-0.5">/api/v1/analyze/free</p>
+            <p className="text-base font-semibold text-gray-800">{primary.title}</p>
+            <p className="text-xs text-gray-500 mt-0.5">{primary.sub}</p>
           </div>
           {loading === "original" ? (
             <div className="w-5 h-5 border-2 border-gray-300 border-t-gray-700 rounded-full animate-spin" />
