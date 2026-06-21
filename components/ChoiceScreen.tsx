@@ -16,7 +16,6 @@ interface Props {
 const PRIMARY_LABEL: Record<GameMode, { title: string; sub: string }> = {
   accuracy: { title: "도전 결과 보기", sub: "정확도 채점" },
   timeattack: { title: "타임어택 결과 보기", sub: "정확도 × 속도 보너스" },
-  boss: { title: "보스전 도전!", sub: "AI 코치 코멘트 포함 (/analyze/boss)" },
 };
 
 export default function ChoiceScreen({

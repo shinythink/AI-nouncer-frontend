@@ -2,23 +2,30 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { fetchLeaderboard, submitScore } from "@/lib/api";
-import { GameMode, LeaderboardEntry } from "@/types/analysis";
+import { GameMode, LeaderboardEntry, User } from "@/types/analysis";
 
 interface Props {
   sentenceId: string;
   mode: GameMode;
   score: number; // 등록할 최종 점수 (타임어택은 보너스 반영 점수)
   grade?: string | null;
+  user?: User | null;
+  durationMs?: number; // 타임어택 기록용(선택)
 }
 
 const MEDALS = ["🥇", "🥈", "🥉"];
 
-export default function Leaderboard({ sentenceId, mode, score, grade }: Props) {
-  const [nickname, setNickname] = useState("");
+export default function Leaderboard({ sentenceId, mode, score, grade, user, durationMs }: Props) {
+  const [nickname, setNickname] = useState(user?.name ?? "");
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [submitted, setSubmitted] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // 로그인 정보가 뒤늦게 들어오면(닉네임 미입력 상태에 한해) 계정 이름으로 채운다.
+  useEffect(() => {
+    if (user?.name) setNickname((prev) => prev || user.name);
+  }, [user]);
 
   const load = useCallback(async () => {
     try {
@@ -38,7 +45,14 @@ export default function Leaderboard({ sentenceId, mode, score, grade }: Props) {
     setBusy(true);
     setError(null);
     try {
-      await submitScore({ nickname: nick, score, sentence_id: sentenceId, mode, grade });
+      await submitScore({
+        nickname: nick,
+        score,
+        sentence_id: sentenceId,
+        mode,
+        grade,
+        duration_ms: durationMs,
+      });
       setSubmitted(true);
       await load();
     } catch (e) {
@@ -50,7 +64,16 @@ export default function Leaderboard({ sentenceId, mode, score, grade }: Props) {
 
   return (
     <div className="bg-gray-50 rounded-xl p-4 flex flex-col gap-3">
-      <p className="text-xs text-gray-400 uppercase tracking-wide">랭킹</p>
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-gray-400 uppercase tracking-wide">
+          {mode === "timeattack" ? "⚡ 타임어택 랭킹" : "랭킹"}
+        </p>
+        {user && !submitted && (
+          <p className="text-[11px] text-gray-400">
+            <span className="font-medium text-gray-500">{user.name}</span>(으)로 기록
+          </p>
+        )}
+      </div>
 
       {!submitted ? (
         <div className="flex gap-2">
