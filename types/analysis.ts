@@ -3,10 +3,40 @@ export interface Sentence {
   text: string;
   // --- 스테이지 메타데이터 (STEP 3) ---
   difficulty: number; // 1~5
-  target_pattern: string; // "ㅅ계열" | "종성" | "혼합"
+  target_pattern: string; // "ㅅ계열" | "종성" | "혼합" (레거시 뱃지)
+  // --- 발음 카테고리 (다중 태깅) ---
+  categories: string[]; // categories.json 의 id 목록
 }
 
-export type GameMode = "accuracy" | "timeattack" | "boss";
+// 한국인이 자주 틀리는 발음 카테고리 (GET /api/v1/categories)
+export interface Category {
+  id: string;
+  label: string;
+  emoji: string;
+  blurb: string;
+  detect_labels?: string[];
+  sentence_count: number;
+}
+
+export type GameMode = "accuracy" | "timeattack";
+
+export interface User {
+  id: number | null;
+  name: string;
+  email?: string | null;
+  picture?: string | null;
+}
+
+export interface PendingProfile {
+  name: string;
+  email?: string | null;
+  picture?: string | null;
+}
+
+export type AuthStatus =
+  | { status: "anonymous" }
+  | { status: "pending"; profile: PendingProfile }
+  | { status: "authenticated"; user: User };
 
 export interface LeaderboardEntry {
   nickname: string;
@@ -14,6 +44,7 @@ export interface LeaderboardEntry {
   sentence_id: string;
   mode: string;
   grade?: string | null;
+  duration_ms?: number | null;
   created_at: string;
 }
 
@@ -23,6 +54,7 @@ export interface ScoreSubmission {
   sentence_id: string;
   mode: GameMode;
   grade?: string | null;
+  duration_ms?: number | null;
 }
 
 export interface AlignmentItem {
@@ -67,4 +99,8 @@ export interface AnalysisResponse {
   max_combo: number;
   reliable: boolean;
   syllable_judgments: SyllableJudgment[];
+
+  // --- 발음 훈련 루프 ---
+  // 이번 라운드에서 약하게 검출된 발음 카테고리 id. 정확도 모드 "더 연습하기"에 사용.
+  weak_categories: string[];
 }

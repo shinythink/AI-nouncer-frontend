@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo } from "react";
-import { AnalysisResponse, GameMode, Grade, SyllableJudgment, Verdict } from "@/types/analysis";
+import { AnalysisResponse, GameMode, Grade, Sentence, SyllableJudgment, User, Verdict } from "@/types/analysis";
+import { recommendNext } from "@/lib/recommend";
 import Leaderboard from "./Leaderboard";
 
 interface Props {
@@ -13,6 +14,11 @@ interface Props {
   durationMs?: number;
   syllableCount?: number;
   sentenceId?: string;
+  user?: User | null;
+  // 발음 훈련 루프(정확도 모드): 방금 읽은 문장 + 전체 문장 풀 + 추천 클릭 핸들러
+  current?: Sentence;
+  sentences?: Sentence[];
+  onPractice?: (sentence: Sentence) => void;
 }
 
 const STAGGER_MS = 70; // 칩 순차 등장 간격
@@ -67,8 +73,21 @@ export default function ResultCard({
   durationMs = 0,
   syllableCount,
   sentenceId,
+  user,
+  current,
+  sentences,
+  onPractice,
 }: Props) {
   const { reliable, score, grade, max_combo, syllable_judgments, advice } = result;
+
+  // 정확도 모드 발음 훈련 루프: 부족했던 발음 위주로 다음 연습 문장 추천(결정적).
+  const recommendations = useMemo(
+    () =>
+      mode === "accuracy" && current && sentences && onPractice
+        ? recommendNext(current, result, sentences)
+        : [],
+    [mode, current, sentences, onPractice, result]
+  );
 
   const comboEnds = useMemo(() => {
     const ends: Record<number, number> = {};
@@ -129,9 +148,6 @@ export default function ResultCard({
           return { bonus, finalScore, targetMs };
         })()
       : null;
-
-  const isBoss = mode === "boss";
-  const cleared = score != null && score >= 75; // 보스전 클리어 기준(B 이상)
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-lg">
@@ -209,52 +225,48 @@ export default function ResultCard({
         </div>
       )}
 
-      {/* 보스전: AI 코치 코멘트를 전면에 (보스전에서만 LLM 호출됨) */}
-      {isBoss && advice?.focus ? (
-        <div className="bg-purple-50 border border-purple-200 rounded-xl p-4 flex flex-col gap-3 animate-badge-in">
-          <p className="text-sm font-bold text-purple-800">
-            {cleared ? "👑 보스 인정! 코치의 한마디" : "👑 보스의 한마디"}
-          </p>
-          <p className="text-base text-purple-900">{advice.focus}</p>
+      {advice?.focus && (
+        <details
+          className="bg-blue-50/60 border border-blue-100 rounded-xl px-4 py-3 animate-chip-in"
+          style={{ animationDelay: `${chipsDone + 100}ms` }}
+        >
+          <summary className="text-sm font-semibold text-blue-800 cursor-pointer select-none">
+            코칭 한마디 보기
+          </summary>
+          <p className="text-sm text-blue-900 mt-2">{advice.focus}</p>
           {advice.drills?.length > 0 && (
-            <ul className="flex flex-col gap-1">
+            <ul className="mt-2 flex flex-col gap-1">
               {advice.drills.map((d, i) => (
-                <li key={i} className="text-sm text-purple-800/90 flex gap-1.5">
-                  <span className="text-purple-400 font-bold">·</span>
+                <li key={i} className="text-sm text-blue-800/90 flex gap-1.5">
+                  <span className="text-blue-400 font-bold">·</span>
                   {d}
                 </li>
               ))}
             </ul>
           )}
-          {advice.next_sentence && (
-            <div className="bg-white/70 border border-purple-200 rounded-lg px-3 py-2">
-              <p className="text-[10px] uppercase tracking-wide text-purple-400 mb-0.5">다음 추천 문장</p>
-              <p className="text-sm font-semibold text-purple-900">{advice.next_sentence}</p>
-            </div>
-          )}
+        </details>
+      )}
+
+      {/* 발음 훈련 루프(정확도 모드): 부족했던 발음 위주로 다음 연습 문장 추천 */}
+      {onPractice && recommendations.length > 0 && (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex flex-col gap-2 animate-badge-in">
+          <p className="text-sm font-bold text-emerald-800">🎯 이 발음 더 연습하기</p>
+          <p className="text-xs text-emerald-700/80">
+            부족했던 발음 위주로 골랐어요. 문장을 눌러 바로 이어서 연습하세요.
+          </p>
+          <div className="flex flex-col gap-2 mt-1">
+            {recommendations.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => onPractice(s)}
+                className="flex items-center justify-between gap-3 text-left bg-white border border-emerald-200 rounded-lg px-3 py-2 hover:bg-emerald-100 transition-colors"
+              >
+                <span className="text-sm text-gray-800">{s.text}</span>
+                <span className="text-[11px] text-emerald-500 shrink-0">난이도 {s.difficulty}</span>
+              </button>
+            ))}
+          </div>
         </div>
-      ) : (
-        advice?.focus && (
-          <details
-            className="bg-blue-50/60 border border-blue-100 rounded-xl px-4 py-3 animate-chip-in"
-            style={{ animationDelay: `${chipsDone + 100}ms` }}
-          >
-            <summary className="text-sm font-semibold text-blue-800 cursor-pointer select-none">
-              코칭 한마디 보기
-            </summary>
-            <p className="text-sm text-blue-900 mt-2">{advice.focus}</p>
-            {advice.drills?.length > 0 && (
-              <ul className="mt-2 flex flex-col gap-1">
-                {advice.drills.map((d, i) => (
-                  <li key={i} className="text-sm text-blue-800/90 flex gap-1.5">
-                    <span className="text-blue-400 font-bold">·</span>
-                    {d}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </details>
-        )
       )}
 
       {sentenceId && (
@@ -263,6 +275,8 @@ export default function ResultCard({
           mode={mode}
           score={timeAttack ? timeAttack.finalScore : (score ?? 0)}
           grade={gradeKey}
+          user={user}
+          durationMs={mode === "timeattack" ? durationMs : undefined}
         />
       )}
 

@@ -18,15 +18,8 @@ const MODES: { key: GameMode; emoji: string; title: string; desc: string; accent
     key: "timeattack",
     emoji: "⚡",
     title: "타임어택 모드",
-    desc: "빠르고 또렷하게! 발음 점수 × 속도 보너스로 최종 점수.",
+    desc: "발음 카테고리를 골라 도전! 발음 점수 × 속도 보너스로 최종 점수.",
     accent: "hover:bg-amber-50 hover:border-amber-300",
-  },
-  {
-    key: "boss",
-    emoji: "👑",
-    title: "보스전 모드",
-    desc: "최고 난이도 문장에 도전. 클리어하면 AI 코치의 인정 코멘트.",
-    accent: "hover:bg-purple-50 hover:border-purple-300",
   },
 ];
 

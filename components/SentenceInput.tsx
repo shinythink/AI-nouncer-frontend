@@ -8,6 +8,9 @@ interface Props {
   mode: GameMode;
   onSelect: (sentence: Sentence) => void;
   onBack: () => void;
+  // 타임어택: 카테고리 우선 선택에서 넘어온 필터
+  category?: string;
+  categoryLabel?: string;
 }
 
 const PATTERN_STYLE: Record<string, string> = {
@@ -28,27 +31,33 @@ function Stars({ n }: { n: number }) {
 const MODE_LABEL: Record<GameMode, string> = {
   accuracy: "정확도 모드",
   timeattack: "타임어택 모드",
-  boss: "보스전 모드",
 };
 
-export default function SentenceInput({ sentences, mode, onSelect, onBack }: Props) {
-  // 난이도 오름차순 스테이지 정렬. 보스전이면 최고 난이도 문장만 노출.
+export default function SentenceInput({
+  sentences,
+  mode,
+  onSelect,
+  onBack,
+  category,
+  categoryLabel,
+}: Props) {
+  // 카테고리 필터(타임어택) → 난이도 오름차순 정렬.
   const stages = useMemo(() => {
-    const sorted = [...sentences].sort((a, b) => a.difficulty - b.difficulty || a.id.localeCompare(b.id));
-    if (mode !== "boss") return sorted;
-    const maxDiff = Math.max(...sentences.map((s) => s.difficulty), 0);
-    return sorted.filter((s) => s.difficulty === maxDiff);
-  }, [sentences, mode]);
-
-  const isBoss = mode === "boss";
+    const pool = category ? sentences.filter((s) => s.categories.includes(category)) : sentences;
+    return [...pool].sort((a, b) => a.difficulty - b.difficulty || a.id.localeCompare(b.id));
+  }, [sentences, category]);
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-lg">
       <div className="text-center">
         <h1 className="text-3xl font-bold text-gray-900 mb-1">{MODE_LABEL[mode]}</h1>
-        <p className="text-gray-500 text-sm">
-          {isBoss ? "최고 난이도 보스 문장에 도전하세요" : "스테이지를 골라 도전하세요 (난이도 낮은 순)"}
-        </p>
+        {categoryLabel ? (
+          <p className="text-gray-500 text-sm">
+            <span className="font-semibold text-amber-600">{categoryLabel}</span> 문장을 골라 도전하세요
+          </p>
+        ) : (
+          <p className="text-gray-500 text-sm">스테이지를 골라 도전하세요 (난이도 낮은 순)</p>
+        )}
       </div>
 
       <div className="flex flex-col gap-3">
@@ -56,14 +65,10 @@ export default function SentenceInput({ sentences, mode, onSelect, onBack }: Pro
           <button
             key={s.id}
             onClick={() => onSelect(s)}
-            className={`flex items-center gap-4 text-left border rounded-xl px-5 py-4 transition-colors group ${
-              isBoss
-                ? "bg-purple-50 border-purple-200 hover:bg-purple-100 hover:border-purple-300"
-                : "bg-gray-50 border-gray-200 hover:bg-blue-50 hover:border-blue-300"
-            }`}
+            className="flex items-center gap-4 text-left bg-gray-50 border border-gray-200 rounded-xl px-5 py-4 transition-colors group hover:bg-blue-50 hover:border-blue-300"
           >
             <span className="text-xs font-bold text-gray-400 w-6 shrink-0">
-              {isBoss ? "👑" : `${i + 1}`}
+              {i + 1}
             </span>
             <div className="flex flex-col gap-1 min-w-0">
               <span className="text-base text-gray-800">{s.text}</span>
@@ -79,7 +84,7 @@ export default function SentenceInput({ sentences, mode, onSelect, onBack }: Pro
       </div>
 
       <button onClick={onBack} className="text-sm text-gray-500 hover:text-gray-700">
-        ← 모드 선택으로
+        {category ? "← 카테고리 선택으로" : "← 모드 선택으로"}
       </button>
     </div>
   );
